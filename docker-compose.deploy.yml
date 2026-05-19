@@ -1,0 +1,26 @@
+services:
+  md-workspace:
+    image: ${MD_WORKSPACE_IMAGE:-ghcr.io/nyaxs/easy-md-view:latest}
+    container_name: md-workspace
+    ports:
+      - "${MD_WORKSPACE_PORT:-23333}:8080"
+    restart: always
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      # History sync is optional. Leave empty to use browser localStorage.
+      # Redis example: set HISTORY_BACKEND=redis and configure REDIS_HOST/REDIS_PASSWORD/REDIS_DB.
+      # MySQL example: set HISTORY_BACKEND=mysql and configure MYSQL_HOST/MYSQL_USER/MYSQL_PASSWORD/MYSQL_DATABASE.
+      - HISTORY_BACKEND=${HISTORY_BACKEND:-}
+      - REDIS_URL=${REDIS_URL:-}
+      - REDIS_HOST=${REDIS_HOST:-}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_USERNAME=${REDIS_USERNAME:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - HISTORY_REDIS_PREFIX=${HISTORY_REDIS_PREFIX:-md-workspace:history}
+      - MYSQL_HOST=${MYSQL_HOST:-}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_USER=${MYSQL_USER:-}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-markdown_workspace}
+      - HISTORY_MYSQL_TABLE=${HISTORY_MYSQL_TABLE:-markdown_history}

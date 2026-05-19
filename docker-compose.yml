@@ -1,0 +1,32 @@
+
+services:
+  md-workspace:
+    build: .
+    container_name: md-workspace
+    ports:
+      - "${MD_WORKSPACE_PORT:-23333}:8080"
+    restart: always
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      # 历史记录同步可选配置。留空时使用浏览器本地 localStorage。
+      # Redis 示例：HISTORY_BACKEND=redis，并配置 REDIS_HOST/REDIS_PASSWORD/REDIS_DB。
+      # MySQL 示例：HISTORY_BACKEND=mysql，并配置 MYSQL_HOST/MYSQL_USER/MYSQL_PASSWORD/MYSQL_DATABASE。
+      - HISTORY_BACKEND=${HISTORY_BACKEND:-}
+      - REDIS_URL=${REDIS_URL:-}
+      - REDIS_HOST=${REDIS_HOST:-}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_USERNAME=${REDIS_USERNAME:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - HISTORY_REDIS_PREFIX=${HISTORY_REDIS_PREFIX:-md-workspace:history}
+      - MYSQL_HOST=${MYSQL_HOST:-}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_USER=${MYSQL_USER:-}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-markdown_workspace}
+      - HISTORY_MYSQL_TABLE=${HISTORY_MYSQL_TABLE:-markdown_history}
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G

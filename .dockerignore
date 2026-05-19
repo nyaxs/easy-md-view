@@ -1,0 +1,11 @@
+.git
+.github
+.agents
+.codex
+__pycache__
+*.py[cod]
+*.bak
+*.tar
+.env
+.env.*
+!.env.example
