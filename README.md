@@ -54,6 +54,8 @@ http://localhost:23333/
 docker compose down
 ```
 
+如果服务器使用旧版独立命令，也可以把上面的 `docker compose` 替换为 `docker-compose`。
+
 ### 使用 GitHub Container Registry 镜像启动
 
 ```bash
@@ -92,6 +94,8 @@ MD_WORKSPACE_PORT=8088 ./deploy.sh
 ```bash
 MD_WORKSPACE_IMAGE=ghcr.io/nyaxs/easy-md-view:latest ./deploy.sh
 ```
+
+`deploy.sh` 会自动优先使用 `docker compose`，如果服务器没有 Compose v2 插件，会回退到 `docker-compose`。
 
 然后访问：
 
@@ -217,6 +221,14 @@ Word 对 SVG 的兼容性并不稳定，直接把 Mermaid SVG 写入 DOCX 常见
 ```bash
 docker compose build
 docker compose up -d
+docker logs -f md-workspace
+```
+
+旧版 Compose 环境可使用：
+
+```bash
+docker-compose build
+docker-compose up -d
 docker logs -f md-workspace
 ```
 

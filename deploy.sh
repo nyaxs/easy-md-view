@@ -10,8 +10,18 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
-  echo "docker compose plugin is required but was not found."
+compose_cmd() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+  else
+    return 127
+  fi
+}
+
+if ! compose_cmd version >/dev/null 2>&1; then
+  echo "docker compose plugin or docker-compose is required but was not found."
   exit 1
 fi
 
@@ -29,7 +39,7 @@ if ! docker image inspect "$APP_IMAGE" >/dev/null 2>&1; then
 fi
 
 echo "Starting Markdown workspace ..."
-docker compose -f "$COMPOSE_FILE" up -d
+compose_cmd -f "$COMPOSE_FILE" up -d
 
 PORT="${MD_WORKSPACE_PORT:-23333}"
 echo "Done. Open: http://<server-ip>:$PORT/"
