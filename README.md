@@ -96,6 +96,7 @@ MD_WORKSPACE_IMAGE=ghcr.io/nyaxs/easy-md-view:latest ./deploy.sh
 ```
 
 `deploy.sh` 会自动优先使用 `docker compose`，如果服务器没有 Compose v2 插件，会回退到 `docker-compose`。
+离线更新时请确保 `md-workspace-image.tar` 中包含 `docker-compose.deploy.yml` 使用的镜像 tag。脚本会在启动时强制重建容器，避免继续运行旧镜像。
 
 然后访问：
 

@@ -39,7 +39,7 @@ if ! docker image inspect "$APP_IMAGE" >/dev/null 2>&1; then
 fi
 
 echo "Starting Markdown workspace ..."
-compose_cmd -f "$COMPOSE_FILE" up -d
+compose_cmd -f "$COMPOSE_FILE" up -d --force-recreate
 
 PORT="${MD_WORKSPACE_PORT:-23333}"
 echo "Done. Open: http://<server-ip>:$PORT/"
