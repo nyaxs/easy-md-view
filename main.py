@@ -43,6 +43,8 @@ DOCX_IMAGE_SCALE_MAX = 4
 DOCX_MAX_IMAGE_WIDTH = 650
 DOCX_MAX_RENDER_SIDE = 4096
 DOCX_SVG_PADDING = 96
+PDF_IMAGE_SCALE = 3
+PDF_MAX_IMAGE_WIDTH = 1000
 HISTORY_REDIS_PREFIX = os.getenv("HISTORY_REDIS_PREFIX", "md-workspace:history")
 HISTORY_MYSQL_TABLE = os.getenv("HISTORY_MYSQL_TABLE", "markdown_history")
 _MYSQL_HISTORY_TABLE_READY = False
@@ -714,11 +716,7 @@ ${bodyHtml}
 
                     try {
                         const result = await mermaid.render(id, block.textContent);
-                        if (format === 'docx') {
-                            diagram.innerHTML = result.svg;
-                        } else {
-                            diagram.innerHTML = result.svg;
-                        }
+                        diagram.innerHTML = result.svg;
                     } catch (error) {
                         diagram.textContent = `Mermaid 渲染失败: ${error.message}`;
                     }
@@ -1318,10 +1316,18 @@ def pad_svg_for_docx(svg_content: str, padding: int = DOCX_SVG_PADDING) -> str:
 
 
 def docx_display_size(width: int, height: int) -> tuple[int, int]:
-    if width <= DOCX_MAX_IMAGE_WIDTH:
+    return image_display_size(width, height, DOCX_MAX_IMAGE_WIDTH)
+
+
+def pdf_display_size(width: int, height: int) -> tuple[int, int]:
+    return image_display_size(width, height, PDF_MAX_IMAGE_WIDTH)
+
+
+def image_display_size(width: int, height: int, max_width: int) -> tuple[int, int]:
+    if width <= max_width:
         return width, height
-    ratio = DOCX_MAX_IMAGE_WIDTH / width
-    return DOCX_MAX_IMAGE_WIDTH, max(int(height * ratio), 1)
+    ratio = max_width / width
+    return max_width, max(int(height * ratio), 1)
 
 
 def docx_render_size(width: int, height: int, image_scale: int) -> tuple[int, int]:
@@ -1371,6 +1377,68 @@ def foreign_object_font_size(content: str) -> int:
     return 16
 
 
+def text_width_units(value: str) -> float:
+    units = 0.0
+    for char in value:
+        units += 0.95 if ord(char) > 127 else 0.48
+    return units
+
+
+def text_fits_width(text: str, max_width: float, font_size: int) -> bool:
+    return text_width_units(text) * max(font_size, 1) <= max_width
+
+
+def wrap_long_token(token: str, max_width: float, font_size: int) -> list[str]:
+    lines: list[str] = []
+    current = ""
+    for char in token:
+        candidate = f"{current}{char}"
+        if current and not text_fits_width(candidate, max_width, font_size):
+            lines.append(current)
+            current = char
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines
+
+
+def wrap_text_to_width(text: str, max_width: float, font_size: int) -> list[str]:
+    wrapped_lines: list[str] = []
+    relaxed_width = max_width * 1.18
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if text_fits_width(line, relaxed_width, font_size):
+            wrapped_lines.append(line)
+            continue
+
+        chunks = re.findall(r"[^\s/_\-:]+[\s/_\-:]*", line)
+        current = ""
+        for chunk in chunks or [line]:
+            candidate = f"{current}{chunk}"
+            if text_fits_width(candidate, max_width, font_size):
+                current = candidate
+                continue
+
+            if current:
+                wrapped_lines.append(current.rstrip())
+                current = ""
+
+            if text_fits_width(chunk, max_width, font_size):
+                current = chunk
+            else:
+                wrapped_lines.extend(wrap_long_token(chunk.rstrip(), max_width, font_size))
+
+        if current:
+            wrapped_lines.append(current.rstrip())
+
+    return wrapped_lines or [text]
+
+
 def foreign_objects_to_svg_text(svg_content: str) -> str:
     def replace_foreign_object(match: re.Match[str]) -> str:
         attrs = parse_simple_attrs(match.group(1))
@@ -1384,9 +1452,13 @@ def foreign_objects_to_svg_text(svg_content: str) -> str:
         width = parse_float(attrs.get("width"), 120)
         height = parse_float(attrs.get("height"), 24)
         font_size = foreign_object_font_size(body)
-        lines = text.splitlines()
+        text_padding = max(font_size * 0.25, 4)
+        lines = wrap_text_to_width(text, width - text_padding * 2, font_size)
         line_height = font_size * 1.2
-        first_line_y = y + (height - line_height * (len(lines) - 1)) / 2
+        if len(lines) * line_height > height - text_padding * 2:
+            font_size = max(int((height - text_padding * 2) / (len(lines) * 1.2)), 9)
+            line_height = font_size * 1.2
+        first_line_y = y + height / 2 - line_height * (len(lines) - 1) / 2
 
         tspans = []
         for index, line in enumerate(lines):
@@ -1438,7 +1510,12 @@ def data_images_to_files_for_docx(input_html: str, task_id: str) -> tuple[str, l
     return converted_file, generated_files, True
 
 
-def svg_to_png_for_docx(input_html: str, task_id: str, image_scale: int) -> tuple[str, list[str]]:
+def svg_to_png_for_docx(
+    input_html: str,
+    task_id: str,
+    image_scale: int,
+    max_display_width: int = DOCX_MAX_IMAGE_WIDTH,
+) -> tuple[str, list[str]]:
     with open(input_html, "r", encoding="utf-8") as f:
         html_content = f.read()
 
@@ -1455,7 +1532,7 @@ def svg_to_png_for_docx(input_html: str, task_id: str, image_scale: int) -> tupl
         svg_content = foreign_objects_to_svg_text(svg_content)
         svg_content = pad_svg_for_docx(svg_content)
         padded_width, padded_height = svg_dimensions(svg_content)
-        display_width, display_height = docx_display_size(original_width, original_height)
+        display_width, display_height = image_display_size(original_width, original_height, max_display_width)
         render_width, render_height = docx_render_size(padded_width, padded_height, image_scale)
         svg_file = f"/tmp/{task_id}-diagram-{index}.svg"
         png_file = f"/tmp/{task_id}-diagram-{index}.png"
@@ -1545,13 +1622,28 @@ async def render_markdown(
                 files_to_cleanup.extend(generated_files)
             pypandoc.convert_file(docx_input_file, "docx", format=input_format, outputfile=output_file)
         elif format == "pdf":
+            pdf_input_file = input_file
+            if html_text:
+                pdf_input_file, generated_files, has_browser_images = data_images_to_files_for_docx(
+                    input_file,
+                    task_id,
+                )
+                files_to_cleanup.extend(generated_files)
+                if not has_browser_images:
+                    pdf_input_file, generated_files = svg_to_png_for_docx(
+                        input_file,
+                        task_id,
+                        PDF_IMAGE_SCALE,
+                        PDF_MAX_IMAGE_WIDTH,
+                    )
+                    files_to_cleanup.extend(generated_files)
             if html_text:
                 run_command([
                     "wkhtmltopdf",
                     "--encoding",
                     "utf-8",
                     "--enable-local-file-access",
-                    input_file,
+                    pdf_input_file,
                     output_file,
                 ])
             else:
