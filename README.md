@@ -56,6 +56,38 @@ docker compose down
 
 如果服务器使用旧版独立命令，也可以把上面的 `docker compose` 替换为 `docker-compose`。
 
+### 构建并导出镜像
+
+如果构建环境访问中国大陆以外网络不稳定，建议使用项目内置脚本构建。脚本默认使用清华 Debian 和 PyPI 镜像源，并会导出离线部署用的 `md-workspace-image.tar`：
+
+```bash
+./build-image.sh
+```
+
+自定义镜像名或导出文件名：
+
+```bash
+IMAGE=easy-md-view:local IMAGE_TAR=easy-md-view.tar ./build-image.sh
+```
+
+使用自定义镜像名离线部署时，需要让部署脚本使用相同的镜像名和 tar 文件：
+
+```bash
+MD_WORKSPACE_IMAGE=easy-md-view:local IMAGE_TAR=easy-md-view.tar ./deploy.sh
+```
+
+如果基础镜像无法从 Docker Hub 拉取，可以先在 Docker 中配置可用的 registry mirror，或通过 `BASE_IMAGE` 指定已经可访问或已预先加载的 Python 基础镜像：
+
+```bash
+BASE_IMAGE=python:3.11-slim-bullseye ./build-image.sh
+```
+
+仅构建不导出 tar：
+
+```bash
+EXPORT_TAR=0 ./build-image.sh
+```
+
 ### 使用 GitHub Container Registry 镜像启动
 
 ```bash
@@ -208,6 +240,7 @@ Word 对 SVG 的兼容性并不稳定，直接把 Mermaid SVG 写入 DOCX 常见
 .
 ├── main.py                  # FastAPI 服务、前端页面、导出逻辑、历史记录接口
 ├── Dockerfile               # 容器镜像构建定义
+├── build-image.sh           # 构建并导出容器镜像
 ├── docker-compose.yml       # 本地构建运行配置
 ├── docker-compose.deploy.yml # 离线迁移部署配置
 ├── deploy.sh                # 一键加载镜像并启动服务

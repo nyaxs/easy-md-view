@@ -1,8 +1,24 @@
-FROM python:3.11-slim-bullseye
+ARG BASE_IMAGE=python:3.11-slim-bullseye
+FROM ${BASE_IMAGE}
+
+ARG APT_MIRROR=
+ARG APT_SECURITY_MIRROR=
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 
 ENV DEBIAN_FRONTEND=noninteractive \
     QT_QPA_PLATFORM=offscreen
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Some older container hosts reject QtCore's Linux ABI note, which makes wkhtmltopdf unable to load libQt5Core.so.5.
+RUN set -eux; \
+    if [ -n "$APT_MIRROR" ]; then \
+      sed -i \
+        -e "s|http://deb.debian.org/debian|$APT_MIRROR|g" \
+        -e "s|http://security.debian.org/debian-security|${APT_SECURITY_MIRROR:-$APT_MIRROR-security}|g" \
+        -e "s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR:-$APT_MIRROR-security}|g" \
+        /etc/apt/sources.list; \
+    fi; \
+    apt-get update && apt-get install -y --no-install-recommends \
+    binutils \
     pandoc \
     wkhtmltopdf \
     librsvg2-bin \
@@ -20,14 +36,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-wqy-microhei \
     fonts-wqy-zenhei \
     xfonts-75dpi \
-    xfonts-base \
-    && rm -rf /var/lib/apt/lists/*
+    xfonts-base; \
+    qtcore_path="$(readlink -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5)"; \
+    strip --remove-section=.note.ABI-tag "$qtcore_path"; \
+    apt-get purge -y --auto-remove binutils; \
+    rm -rf /var/lib/apt/lists/*
 RUN wkhtmltopdf --version && pandoc --version && rsvg-convert --version
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn --no-cache-dir -r requirements.txt
+RUN pip install -i "$PIP_INDEX_URL" --trusted-host "$PIP_TRUSTED_HOST" --no-cache-dir -r requirements.txt
 
 COPY main.py .
 EXPOSE 8080
